@@ -13,6 +13,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.Typeface
+import androidx.core.content.res.ResourcesCompat
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -215,18 +216,25 @@ class TaskCounterOverlay(
         // アニメーション用プロパティ
         private var animScale = 1f
         private var animAlpha = 1f
-        private var currentBgColor = 0xA02d9c4a.toInt()
-        private var originalBgColor = 0xA02d9c4a.toInt()  // 成功アニメーション後に戻る色
         private var hokoriRotation = 0f
-        private var checkmarkProgress = 0f  // 0 = 非表示, 1 = 完全表示
+        private var tadaProgress = 0f  // 🎉の表示進捗 (0 = 非表示, 1 = 完全表示)
         private var isSuccessAnimating = false
+
+        // 色定義
+        private val bgColor = 0xDDF5F5F5.toInt()           // 自然な白系背景
+        private val successBgColor = 0xDD2d9c4a.toInt()    // 成功時の緑背景
+        private var currentBgColor = bgColor
+        private val supremeRed = 0xFFFF0000.toInt()        // 赤 #FF0000
+        private val safeGreen = 0xFF51cf66.toInt()         // 安全な緑
+        private var currentTextColor = Color.WHITE
+        private var originalTextColor = Color.WHITE
 
         // アニメーター
         private var currentAnimator: ValueAnimator? = null
         private var idleAnimator: ValueAnimator? = null
         private var colorAnimator: ValueAnimator? = null
         private var rotationAnimator: ValueAnimator? = null
-        private var checkmarkAnimator: ValueAnimator? = null
+        private var tadaAnimator: ValueAnimator? = null
 
         private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
@@ -236,39 +244,42 @@ class TaskCounterOverlay(
         private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             this.strokeWidth = this@CounterView.strokeWidth
-            color = 0x30FFFFFF
+            color = 0x15FFFFFF  // より透過
         }
 
-        private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            alpha = 120 // うっすら表示（0-255）
+        private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG)  // 透過なし
+
+        // Ubuntu Bold Italicフォント
+        private val ubuntuBoldItalic: Typeface? = try {
+            ResourcesCompat.getFont(context, R.font.ubuntu_bold_italic)
+        } catch (e: Exception) {
+            null
         }
 
         private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textAlign = Paint.Align.CENTER
-            typeface = Typeface.DEFAULT_BOLD
-            isFakeBoldText = true
+            typeface = ubuntuBoldItalic ?: Typeface.defaultFromStyle(Typeface.BOLD_ITALIC)
+            isFakeBoldText = true  // さらに太く
         }
 
         private val textStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textAlign = Paint.Align.CENTER
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = ubuntuBoldItalic ?: Typeface.defaultFromStyle(Typeface.BOLD_ITALIC)
             style = Paint.Style.STROKE
-            strokeWidth = 3f
-        }
-
-        private val checkmarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            style = Paint.Style.STROKE
-            strokeWidth = 4 * density
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
+            strokeWidth = 2 * density  // 程よい縁取り
+            isFakeBoldText = true
         }
 
         private val hokori: Bitmap? = try {
-            val original = BitmapFactory.decodeResource(context.resources, R.drawable.ic_launcher_foreground)
-            Bitmap.createScaledBitmap(original, size, size, true)
+            val original = BitmapFactory.decodeResource(context.resources, R.drawable.hokori)
+            // アスペクト比を維持してリサイズ
+            val maxSize = (size * 0.7f)
+            val scale = minOf(maxSize / original.width, maxSize / original.height)
+            val newWidth = (original.width * scale).toInt()
+            val newHeight = (original.height * scale).toInt()
+            Bitmap.createScaledBitmap(original, newWidth, newHeight, true)
         } catch (e: Exception) {
             null
         }
@@ -282,25 +293,29 @@ class TaskCounterOverlay(
             val newTotal = count?.total
             this.count = count
 
-            // 色の計算
-            val newColor = when {
-                (newTotal ?: 0) == 0 -> 0xA02d9c4a.toInt()  // 緑
-                (newTotal ?: 0) <= 3 -> 0xA0f59f00.toInt()  // オレンジ
-                else -> 0xA0e03131.toInt()                   // 赤
+            // 数字の色を計算（タスク数で危機感を表現）
+            val newTextColor = when {
+                (newTotal ?: 0) == 0 -> safeGreen      // 0件: 緑（安全）
+                (newTotal ?: 0) <= 3 -> Color.WHITE   // 1-3件: 白
+                else -> supremeRed                     // 4件以上: Supreme赤（危険）
             }
 
             // 元の色を保存（成功アニメーション後に戻る色）
-            originalBgColor = newColor
+            originalTextColor = newTextColor
 
-            // カウントが変わった場合、パルスアニメーション & 色遷移
-            // ただし成功アニメーション中は色を変えない（後で戻すため）
+            // カウントが変わった場合、パルスアニメーション
             if (oldTotal != null && newTotal != null && oldTotal != newTotal) {
                 animateCountChange()
                 if (!isSuccessAnimating) {
-                    animateColorChange(currentBgColor, newColor)
+                    currentTextColor = newTextColor
                 }
             } else if (!isSuccessAnimating) {
-                currentBgColor = newColor
+                currentTextColor = newTextColor
+            }
+
+            // 背景色は固定（成功アニメーション中以外）
+            if (!isSuccessAnimating) {
+                currentBgColor = bgColor
             }
 
             invalidate()
@@ -450,20 +465,6 @@ class TaskCounterOverlay(
             }
         }
 
-        // 色遷移アニメーション
-        private fun animateColorChange(fromColor: Int, toColor: Int) {
-            colorAnimator?.cancel()
-
-            colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), fromColor, toColor).apply {
-                duration = 200
-                addUpdateListener { animator ->
-                    currentBgColor = animator.animatedValue as Int
-                    invalidate()
-                }
-                start()
-            }
-        }
-
         // アイドル時パルスアニメーション（呼吸効果）
         private fun startIdleAnimation() {
             if (idleAnimator?.isRunning == true) return
@@ -485,7 +486,7 @@ class TaskCounterOverlay(
             idleAnimator = null
         }
 
-        // 読み込み成功アニメーション（hokori一回転 + 緑 + チェックマーク）
+        // タスク減少時の成功アニメーション（hokori一回転 + 緑背景 + 🎉）
         fun animateSuccess() {
             if (isSuccessAnimating) return
             isSuccessAnimating = true
@@ -493,12 +494,11 @@ class TaskCounterOverlay(
             stopIdleAnimation()
             currentAnimator?.cancel()
             rotationAnimator?.cancel()
-            checkmarkAnimator?.cancel()
+            tadaAnimator?.cancel()
             colorAnimator?.cancel()
 
-            // 緑色に変更
-            val successColor = 0xE02d9c4a.toInt()
-            colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), currentBgColor, successColor).apply {
+            // 緑背景に変更
+            colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), currentBgColor, successBgColor).apply {
                 duration = 300
                 addUpdateListener { animator ->
                     currentBgColor = animator.animatedValue as Int
@@ -518,7 +518,7 @@ class TaskCounterOverlay(
                 start()
             }
 
-            // パルス効果（少し大きくなって戻る）
+            // パルス効果
             currentAnimator = ValueAnimator.ofFloat(1f, 1.3f, 1f).apply {
                 duration = 400
                 interpolator = OvershootInterpolator(1.5f)
@@ -529,38 +529,35 @@ class TaskCounterOverlay(
                 start()
             }
 
-            // チェックマーク表示（遅延開始）
-            checkmarkAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            // 🎉表示（遅延開始）
+            tadaAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
                 duration = 300
                 startDelay = 200
                 interpolator = OvershootInterpolator(2f)
                 addUpdateListener { animator ->
-                    checkmarkProgress = animator.animatedValue as Float
+                    tadaProgress = animator.animatedValue as Float
                     invalidate()
                 }
                 addListener(object : android.animation.AnimatorListenerAdapter() {
                     override fun onAnimationEnd(animation: android.animation.Animator) {
-                        // チェックマークを一定時間後に消す
-                        postDelayed({
-                            hideCheckmark()
-                        }, 800)
+                        postDelayed({ hideTada() }, 800)
                     }
                 })
                 start()
             }
         }
 
-        // チェックマークを消すアニメーション & 元の色に戻す
-        private fun hideCheckmark() {
-            checkmarkAnimator?.cancel()
+        // 🎉を消すアニメーション & 元の背景に戻す
+        private fun hideTada() {
+            tadaAnimator?.cancel()
             colorAnimator?.cancel()
 
-            // チェックマークをフェードアウト
-            checkmarkAnimator = ValueAnimator.ofFloat(checkmarkProgress, 0f).apply {
+            // 🎉をフェードアウト
+            tadaAnimator = ValueAnimator.ofFloat(tadaProgress, 0f).apply {
                 duration = 200
                 interpolator = DecelerateInterpolator()
                 addUpdateListener { animator ->
-                    checkmarkProgress = animator.animatedValue as Float
+                    tadaProgress = animator.animatedValue as Float
                     invalidate()
                 }
                 addListener(object : android.animation.AnimatorListenerAdapter() {
@@ -571,8 +568,8 @@ class TaskCounterOverlay(
                 start()
             }
 
-            // 元の色に戻す
-            colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), currentBgColor, originalBgColor).apply {
+            // 元の背景に戻す
+            colorAnimator = ValueAnimator.ofObject(ArgbEvaluator(), currentBgColor, bgColor).apply {
                 duration = 300
                 addUpdateListener { animator ->
                     currentBgColor = animator.animatedValue as Int
@@ -581,6 +578,7 @@ class TaskCounterOverlay(
                 addListener(object : android.animation.AnimatorListenerAdapter() {
                     override fun onAnimationEnd(animation: android.animation.Animator) {
                         isSuccessAnimating = false
+                        currentTextColor = originalTextColor
                         startIdleAnimation()
                     }
                 })
@@ -590,6 +588,7 @@ class TaskCounterOverlay(
 
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             val totalSize = size + (shadowRadius * 2).toInt()
+            // 固定サイズを強制
             setMeasuredDimension(totalSize, totalSize)
         }
 
@@ -610,14 +609,9 @@ class TaskCounterOverlay(
             // 円を描画
             canvas.drawCircle(cx, cy, radius - strokeWidth, bgPaint)
 
-            // hokori画像をうっすら描画（円形にクリップ + 回転）
+            // hokori画像を描画（クリップなし、はみ出しOK）
             hokori?.let {
                 canvas.save()
-                val clipPath = Path().apply {
-                    addCircle(cx, cy, radius - strokeWidth, Path.Direction.CW)
-                }
-                canvas.clipPath(clipPath)
-
                 // 回転を適用
                 canvas.rotate(hokoriRotation, cx, cy)
 
@@ -629,63 +623,55 @@ class TaskCounterOverlay(
 
             canvas.drawCircle(cx, cy, radius - strokeWidth, strokePaint)
 
-            // チェックマーク表示中は数字を隠す
-            if (checkmarkProgress > 0f) {
-                // チェックマークを描画
-                drawCheckmark(canvas, cx, cy, checkmarkProgress)
+            // 🎉表示中は数字を隠す
+            if (tadaProgress > 0f) {
+                // 🎉を描画
+                drawTada(canvas, cx, cy, tadaProgress)
             } else {
-                // 数字
+                // 数字（色はタスク数に応じて変化）
                 val text = if (total > 99) "99+" else total.toString()
                 val textSize = when {
-                    text.length == 1 -> 24 * density
-                    text.length == 2 -> 20 * density
-                    else -> 14 * density
+                    text.length == 1 -> 32 * density   // 大きく
+                    text.length == 2 -> 28 * density   // 大きく
+                    else -> 18 * density
                 }
                 textPaint.textSize = textSize
+                textPaint.color = currentTextColor
+                textPaint.alpha = 255
                 textStrokePaint.textSize = textSize
+                textStrokePaint.color = currentTextColor
+                textStrokePaint.alpha = 255
 
+                // 斜体の視覚補正（少し左にオフセット）
+                val italicOffset = textSize * 0.08f
                 val textY = cy - (textPaint.descent() + textPaint.ascent()) / 2
-                canvas.drawText(text, cx, textY, textStrokePaint) // 太い輪郭
-                canvas.drawText(text, cx, textY, textPaint)        // 塗りつぶし
+
+                // レイヤーで一括透過（縁取りと塗りが同じ透過度に）
+                canvas.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), 120)
+                canvas.drawText(text, cx - italicOffset, textY, textStrokePaint)  // 太い縁取り
+                canvas.drawText(text, cx - italicOffset, textY, textPaint)         // 塗りつぶし
+                canvas.restore()
             }
 
             canvas.restore()
         }
 
-        // チェックマークを描画
-        private fun drawCheckmark(canvas: Canvas, cx: Float, cy: Float, progress: Float) {
-            val checkSize = radius * 0.5f
+        // 🎉を描画
+        private fun drawTada(canvas: Canvas, cx: Float, cy: Float, progress: Float) {
+            val emojiSize = 24 * density
+            textPaint.textSize = emojiSize
+            textPaint.color = Color.WHITE
+            textPaint.alpha = (255 * progress).toInt()
 
-            // チェックマークのパス（左下から中央下、中央下から右上）
-            val startX = cx - checkSize * 0.5f
-            val startY = cy
-            val midX = cx - checkSize * 0.1f
-            val midY = cy + checkSize * 0.35f
-            val endX = cx + checkSize * 0.5f
-            val endY = cy - checkSize * 0.35f
+            val scale = 0.5f + (progress * 0.5f)  // 0.5 → 1.0 にスケール
+            canvas.save()
+            canvas.scale(scale, scale, cx, cy)
 
-            // プログレスに応じて描画
-            checkmarkPaint.alpha = (255 * progress).toInt()
+            val textY = cy - (textPaint.descent() + textPaint.ascent()) / 2
+            canvas.drawText("🎉", cx, textY, textPaint)
 
-            val path = Path()
-            if (progress <= 0.5f) {
-                // 最初の半分：左下から中央下
-                val t = progress * 2
-                val currentX = startX + (midX - startX) * t
-                val currentY = startY + (midY - startY) * t
-                path.moveTo(startX, startY)
-                path.lineTo(currentX, currentY)
-            } else {
-                // 後半：中央下から右上
-                val t = (progress - 0.5f) * 2
-                val currentX = midX + (endX - midX) * t
-                val currentY = midY + (endY - midY) * t
-                path.moveTo(startX, startY)
-                path.lineTo(midX, midY)
-                path.lineTo(currentX, currentY)
-            }
-
-            canvas.drawPath(path, checkmarkPaint)
+            canvas.restore()
+            textPaint.alpha = 255
         }
     }
 }
