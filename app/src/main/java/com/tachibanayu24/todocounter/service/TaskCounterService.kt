@@ -15,6 +15,7 @@ class TaskCounterService : Service() {
     private lateinit var repository: TasksRepository
     private var overlay: TaskCounterOverlay? = null
     private var periodicJob: Job? = null
+    private var lastTaskCount: Int? = null  // 前回のタスク数を保存
 
     override fun onCreate() {
         super.onCreate()
@@ -65,6 +66,8 @@ class TaskCounterService : Service() {
             // オーバーレイ：0なら非表示、1以上なら表示
             overlay?.let {
                 val total = count?.total ?: 0
+                val previousCount = lastTaskCount
+
                 if (total == 0) {
                     it.hide()
                 } else if (it.isShowing()) {
@@ -76,7 +79,15 @@ class TaskCounterService : Service() {
                 // fetch成功時にバイブ
                 if (vibrateOnSuccess && count != null) {
                     it.vibrate()
+
+                    // タスクが減っていた場合のみ成功アニメーション
+                    if (previousCount != null && total < previousCount) {
+                        it.animateSuccess()
+                    }
                 }
+
+                // 今回のタスク数を保存
+                lastTaskCount = total
             }
         }
     }
