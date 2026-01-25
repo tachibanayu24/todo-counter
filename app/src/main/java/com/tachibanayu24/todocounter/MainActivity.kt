@@ -1,11 +1,9 @@
 package com.tachibanayu24.todocounter
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -18,10 +16,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.tachibanayu24.todocounter.api.TaskCount
 import com.tachibanayu24.todocounter.api.TasksRepository
 import com.tachibanayu24.todocounter.auth.GoogleAuthManager
@@ -50,18 +48,12 @@ fun MainScreen() {
     var isSignedIn by remember { mutableStateOf(authManager.isSignedIn()) }
     var taskCount by remember { mutableStateOf<TaskCount?>(null) }
     var isLoading by remember { mutableStateOf(false) }
-    var hasNotificationPermission by remember {
-        mutableStateOf(
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) == PackageManager.PERMISSION_GRANTED
-            } else true
-        )
-    }
     var hasOverlayPermission by remember {
         mutableStateOf(Settings.canDrawOverlays(context))
+    }
+    var hasBatteryOptimizationExemption by remember {
+        val pm = context.getSystemService(PowerManager::class.java)
+        mutableStateOf(pm.isIgnoringBatteryOptimizations(context.packageName))
     }
 
     val signInLauncher = rememberLauncherForActivityResult(
@@ -74,19 +66,10 @@ fun MainScreen() {
                 isLoading = true
                 taskCount = repository.getTaskCount()
                 isLoading = false
-                if (hasNotificationPermission) {
+                if (hasOverlayPermission) {
                     TaskCounterService.start(context)
                 }
             }
-        }
-    }
-
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        hasNotificationPermission = granted
-        if (granted && isSignedIn) {
-            TaskCounterService.start(context)
         }
     }
 
@@ -95,9 +78,15 @@ fun MainScreen() {
     ) {
         hasOverlayPermission = Settings.canDrawOverlays(context)
         if (hasOverlayPermission && isSignedIn) {
-            // サービスを更新してオーバーレイを有効化
-            TaskCounterService.update(context)
+            TaskCounterService.start(context)
         }
+    }
+
+    val batteryOptimizationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        val pm = context.getSystemService(PowerManager::class.java)
+        hasBatteryOptimizationExemption = pm.isIgnoringBatteryOptimizations(context.packageName)
     }
 
     LaunchedEffect(Unit) {
@@ -106,7 +95,7 @@ fun MainScreen() {
             taskCount = repository.getTaskCount()
             isLoading = false
 
-            if (hasNotificationPermission) {
+            if (hasOverlayPermission) {
                 TaskCounterService.start(context)
             }
         }
@@ -124,7 +113,7 @@ fun MainScreen() {
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "ToDo Counter",
+                text = stringResource(R.string.app_name),
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
@@ -140,40 +129,9 @@ fun MainScreen() {
                         contentColor = Color.Black
                     )
                 ) {
-                    Text("Googleでサインイン")
+                    Text(stringResource(R.string.sign_in_with_google))
                 }
             } else {
-                if (!hasNotificationPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFF1a1a3e)
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "通知の許可が必要です",
-                                color = Color.White,
-                                fontSize = 16.sp
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(
-                                onClick = {
-                                    notificationPermissionLauncher.launch(
-                                        Manifest.permission.POST_NOTIFICATIONS
-                                    )
-                                }
-                            ) {
-                                Text("許可する")
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
-                }
-
                 if (!hasOverlayPermission) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -186,15 +144,9 @@ fun MainScreen() {
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "オーバーレイ表示（任意）",
+                                text = stringResource(R.string.overlay_permission_required),
                                 color = Color.White,
                                 fontSize = 16.sp
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "画面上に常時表示",
-                                color = Color.Gray,
-                                fontSize = 12.sp
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Button(
@@ -206,7 +158,46 @@ fun MainScreen() {
                                     overlayPermissionLauncher.launch(intent)
                                 }
                             ) {
-                                Text("設定を開く")
+                                Text(stringResource(R.string.open_settings))
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+
+                if (!hasBatteryOptimizationExemption) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFF1a1a3e)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = stringResource(R.string.battery_optimization_title),
+                                color = Color.White,
+                                fontSize = 16.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.battery_optimization_description),
+                                color = Color.Gray,
+                                fontSize = 12.sp
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = {
+                                    val intent = Intent(
+                                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                        Uri.parse("package:${context.packageName}")
+                                    )
+                                    batteryOptimizationLauncher.launch(intent)
+                                }
+                            ) {
+                                Text(stringResource(R.string.open_settings))
                             }
                         }
                     }
@@ -236,7 +227,7 @@ fun MainScreen() {
                                 color = Color(0xFFff6b6b)
                             )
                             Text(
-                                text = "期限切れ",
+                                text = stringResource(R.string.overdue_tasks),
                                 fontSize = 14.sp,
                                 color = Color.Gray
                             )
@@ -249,7 +240,7 @@ fun MainScreen() {
                                 color = Color(0xFFffd43b)
                             )
                             Text(
-                                text = "今日",
+                                text = stringResource(R.string.today_tasks),
                                 fontSize = 14.sp,
                                 color = Color.Gray
                             )
@@ -257,7 +248,7 @@ fun MainScreen() {
                     }
                 } else {
                     Text(
-                        text = "タスクを取得できませんでした",
+                        text = stringResource(R.string.fetch_failed),
                         color = Color.Gray
                     )
                 }
@@ -274,7 +265,7 @@ fun MainScreen() {
                         }
                     }
                 ) {
-                    Text("サインアウト", color = Color.Gray)
+                    Text(stringResource(R.string.sign_out), color = Color.Gray)
                 }
             }
         }

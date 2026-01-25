@@ -21,10 +21,6 @@ data class TaskCount(
 
 class TasksRepository(private val context: Context) {
 
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
-        timeZone = TimeZone.getTimeZone("UTC")
-    }
-
     private fun getTasksService(): Tasks? {
         val account = GoogleSignIn.getLastSignedInAccount(context) ?: return null
 
@@ -86,15 +82,18 @@ class TasksRepository(private val context: Context) {
     }
 
     private fun parseDueDate(dueString: String): Date? {
+        // Google Tasks APIは RFC 3339 形式で返す (例: 2024-01-15T00:00:00.000Z)
+        val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
         return try {
-            // Google Tasks APIは RFC 3339 形式で返す (例: 2024-01-15T00:00:00.000Z)
-            val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
-                timeZone = TimeZone.getTimeZone("UTC")
-            }
             isoFormat.parse(dueString)
         } catch (e: Exception) {
+            // フォールバック: yyyy-MM-dd 形式
             try {
-                dateFormat.parse(dueString)
+                SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+                    timeZone = TimeZone.getTimeZone("UTC")
+                }.parse(dueString)
             } catch (e: Exception) {
                 null
             }
