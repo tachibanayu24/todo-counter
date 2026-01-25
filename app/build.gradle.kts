@@ -41,6 +41,19 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.4"
     }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/DEPENDENCIES"
+            excludes += "/META-INF/LICENSE"
+            excludes += "/META-INF/LICENSE.txt"
+            excludes += "/META-INF/license.txt"
+            excludes += "/META-INF/NOTICE"
+            excludes += "/META-INF/NOTICE.txt"
+            excludes += "/META-INF/notice.txt"
+        }
+    }
 }
 
 dependencies {
@@ -55,12 +68,6 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-
-    // DataStore for settings
-    implementation("androidx.datastore:datastore-preferences:1.0.0")
-
-    // WorkManager for background tasks
-    implementation("androidx.work:work-runtime-ktx:2.9.0")
 
     // Google API Client
     implementation("com.google.api-client:google-api-client-android:2.2.0")
