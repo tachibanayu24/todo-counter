@@ -1,0 +1,43 @@
+{
+  "enabledPlugins": {
+    "context7@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm install)",
+      "Bash(npx prettier:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx react-router typegen)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git status:*)",
+      "Bash(git branch:*)",
+      "Bash(ls:*)",
+      "Bash(tree:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue list:*)",
+      "Bash(git show:*)",
+      "Bash(git blame:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git -C * show:*)",
+      "Bash(git -C * log:*)",
+      "Bash(git -C * diff:*)",
+      "Bash(git -C * blame:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "WebSearch",
+      "Skill(*)"
+    ]
+  }
+}

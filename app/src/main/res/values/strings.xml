@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ToDo Counter</string>
+
+    <string name="notification_channel_name">タスクカウンター</string>
+    <string name="notification_channel_description">残りタスク数をステータスバーに表示します</string>
+
+    <string name="sign_in_with_google">Googleでサインイン</string>
+    <string name="sign_out">サインアウト</string>
+    <string name="overdue_tasks">期限切れ</string>
+    <string name="today_tasks">今日</string>
+    <string name="total_remaining">残りタスク</string>
+</resources>
