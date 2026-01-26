@@ -6,6 +6,8 @@ import android.content.Intent
 import android.os.IBinder
 import android.provider.Settings
 import com.tachibanayu24.todocounter.api.TasksRepository
+import com.tachibanayu24.todocounter.data.AppDatabase
+import com.tachibanayu24.todocounter.data.repository.CompletionRepository
 import com.tachibanayu24.todocounter.overlay.TaskCounterOverlay
 import kotlinx.coroutines.*
 
@@ -13,6 +15,7 @@ class TaskCounterService : Service() {
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private lateinit var repository: TasksRepository
+    private lateinit var completionRepository: CompletionRepository
     private var overlay: TaskCounterOverlay? = null
     private var periodicJob: Job? = null
     private var lastTaskCount: Int? = null  // 前回のタスク数を保存
@@ -20,6 +23,9 @@ class TaskCounterService : Service() {
     override fun onCreate() {
         super.onCreate()
         repository = TasksRepository(this)
+        completionRepository = CompletionRepository(
+            AppDatabase.getInstance(this).dailyCompletionDao()
+        )
 
         if (Settings.canDrawOverlays(this)) {
             overlay = TaskCounterOverlay(this) { onOverlayTap() }
@@ -80,9 +86,14 @@ class TaskCounterService : Service() {
                 if (vibrateOnSuccess && count != null) {
                     it.vibrate()
 
-                    // タスクが減っていた場合のみ成功アニメーション
+                    // タスクが減っていた場合のみ成功アニメーション & DB記録
                     if (previousCount != null && total < previousCount) {
+                        val completedCount = previousCount - total
                         it.animateSuccess()
+                        // DBに完了数を記録
+                        scope.launch(Dispatchers.IO) {
+                            completionRepository.recordCompletion(completedCount)
+                        }
                     }
                 }
 

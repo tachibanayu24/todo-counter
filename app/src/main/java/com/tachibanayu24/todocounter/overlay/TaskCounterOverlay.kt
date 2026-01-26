@@ -24,6 +24,7 @@ import android.view.View
 import android.view.WindowManager
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
+import com.tachibanayu24.todocounter.MainActivity
 import com.tachibanayu24.todocounter.R
 import com.tachibanayu24.todocounter.api.TaskCount
 import kotlin.math.abs
@@ -123,13 +124,24 @@ class TaskCounterOverlay(
         }
     }
 
+    private fun openApp() {
+        try {
+            val intent = Intent(context, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     private fun createOverlayView(): CounterView {
         val params = layoutParams
         val wm = windowManager
 
         return CounterView(context).apply {
-            // ドラッグ移動 & シングルタップで更新 & 長押しでGoogle Tasks起動
+            // ドラッグ移動 & シングルタップで更新 & 長押しでGoogle Tasks起動 & ダブルタップでアプリ起動
             var initialX = 0
             var initialY = 0
             var initialTouchX = 0f
@@ -138,6 +150,10 @@ class TaskCounterOverlay(
             var isLongPress = false
             val longPressTimeout = 500L
             var longPressRunnable: Runnable? = null
+
+            // ダブルタップ検出用
+            var lastTapTime = 0L
+            val doubleTapTimeout = 300L
 
             setOnTouchListener { view, event ->
                 val counterView = view as CounterView
@@ -185,9 +201,18 @@ class TaskCounterOverlay(
                             // ドラッグ終了アニメーション
                             counterView.animateDragEnd()
                         } else if (!isLongPress) {
-                            // シングルタップ → 更新
-                            counterView.animateTapUp()
-                            onTapToRefresh()
+                            val currentTime = System.currentTimeMillis()
+                            if (currentTime - lastTapTime < doubleTapTimeout) {
+                                // ダブルタップ → アプリを開く
+                                counterView.animateTapUp()
+                                openApp()
+                                lastTapTime = 0L
+                            } else {
+                                // シングルタップ → 更新
+                                counterView.animateTapUp()
+                                onTapToRefresh()
+                                lastTapTime = currentTime
+                            }
                         } else {
                             counterView.animateTapUp()
                         }
@@ -293,12 +318,8 @@ class TaskCounterOverlay(
             val newTotal = count?.total
             this.count = count
 
-            // 数字の色を計算（タスク数で危機感を表現）
-            val newTextColor = when {
-                (newTotal ?: 0) == 0 -> safeGreen      // 0件: 緑（安全）
-                (newTotal ?: 0) <= 3 -> Color.WHITE   // 1-3件: 白
-                else -> supremeRed                     // 4件以上: Supreme赤（危険）
-            }
+            // 数字の色は常に赤
+            val newTextColor = supremeRed
 
             // 元の色を保存（成功アニメーション後に戻る色）
             originalTextColor = newTextColor
