@@ -224,7 +224,7 @@ private fun AccountCard(
                 }
             }
 
-            Divider()
+            HorizontalDivider()
 
             TextButton(
                 onClick = onSignOut,
@@ -276,7 +276,7 @@ private fun PermissionsCard(
             isGranted = hasOverlayPermission,
             onRequestClick = onRequestOverlay
         )
-        Divider()
+        HorizontalDivider()
         PermissionItem(
             icon = Icons.Default.BatteryChargingFull,
             title = "Battery optimization",
@@ -387,6 +387,8 @@ private fun DataCard(
 
 @Composable
 private fun AboutCard() {
+    val context = LocalContext.current
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -407,6 +409,32 @@ private fun AboutCard() {
                 text = "1.0.0",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        HorizontalDivider()
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    context.startActivity(
+                        Intent(context, com.google.android.gms.oss.licenses.OssLicensesMenuActivity::class.java)
+                    )
+                }
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Open Source Licenses",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

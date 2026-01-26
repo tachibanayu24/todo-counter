@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,8 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.google.accompanist.swiperefresh.SwipeRefresh
-import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import com.tachibanayu24.todocounter.R
 import com.tachibanayu24.todocounter.auth.GoogleAuthManager
 import com.tachibanayu24.todocounter.service.TaskCounterService
@@ -113,8 +112,9 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
                 }
             }
         } else {
-            SwipeRefresh(
-                state = rememberSwipeRefreshState(isRefreshing = uiState.isLoading),
+            @OptIn(ExperimentalMaterial3Api::class)
+            PullToRefreshBox(
+                isRefreshing = uiState.isLoading,
                 onRefresh = { viewModel.refresh() },
                 modifier = Modifier.fillMaxSize()
             ) {

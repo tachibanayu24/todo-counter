@@ -41,6 +41,13 @@
             </intent-filter>
         </receiver>
 
+        <activity
+            android:name="com.google.android.gms.oss.licenses.OssLicensesMenuActivity"
+            android:theme="@style/Theme.ToDoCounter.AppCompat" />
+        <activity
+            android:name="com.google.android.gms.oss.licenses.OssLicensesActivity"
+            android:theme="@style/Theme.ToDoCounter.AppCompat" />
+
     </application>
 
 </manifest>
