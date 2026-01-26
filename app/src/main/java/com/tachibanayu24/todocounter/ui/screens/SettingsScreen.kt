@@ -224,7 +224,7 @@ private fun AccountCard(
                 }
             }
 
-            HorizontalDivider()
+            Divider()
 
             TextButton(
                 onClick = onSignOut,
@@ -276,7 +276,7 @@ private fun PermissionsCard(
             isGranted = hasOverlayPermission,
             onRequestClick = onRequestOverlay
         )
-        HorizontalDivider()
+        Divider()
         PermissionItem(
             icon = Icons.Default.BatteryChargingFull,
             title = "Battery optimization",
