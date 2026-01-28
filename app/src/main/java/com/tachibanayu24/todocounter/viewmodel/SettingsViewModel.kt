@@ -1,18 +1,17 @@
 package com.tachibanayu24.todocounter.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
-import com.tachibanayu24.todocounter.api.TasksRepository
 import com.tachibanayu24.todocounter.auth.GoogleAuthManager
-import com.tachibanayu24.todocounter.data.AppDatabase
 import com.tachibanayu24.todocounter.data.SyncManager
-import com.tachibanayu24.todocounter.data.repository.CompletionRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import javax.inject.Inject
 
 data class SettingsUiState(
     val isSignedIn: Boolean = false,
@@ -21,14 +20,11 @@ data class SettingsUiState(
     val syncMessage: String? = null
 )
 
-class SettingsViewModel(application: Application) : AndroidViewModel(application) {
-    private val authManager = GoogleAuthManager(application)
-    private val db = AppDatabase.getInstance(application)
-    private val syncManager = SyncManager(
-        TasksRepository(application),
-        CompletionRepository(db.dailyCompletionDao()),
-        db.completedTaskDao()
-    )
+@HiltViewModel
+class SettingsViewModel @Inject constructor(
+    private val authManager: GoogleAuthManager,
+    private val syncManager: SyncManager
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -64,6 +60,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     syncMessage = "Synced ${result.synced} tasks from past $days days"
                 )
             } catch (e: Exception) {
+                Timber.e(e, "Failed to sync completed tasks")
                 _uiState.value = _uiState.value.copy(
                     isSyncing = false,
                     syncMessage = "Sync failed: ${e.message}"

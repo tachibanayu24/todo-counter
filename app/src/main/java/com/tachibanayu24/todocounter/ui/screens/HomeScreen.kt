@@ -23,7 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.tachibanayu24.todocounter.R
 import com.tachibanayu24.todocounter.auth.GoogleAuthManager
 import com.tachibanayu24.todocounter.service.TaskCounterService
@@ -36,7 +36,7 @@ import com.tachibanayu24.todocounter.ui.theme.Yellow
 import com.tachibanayu24.todocounter.viewmodel.HomeViewModel
 
 @Composable
-fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
+fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val authManager = remember { GoogleAuthManager(context) }

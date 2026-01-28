@@ -27,6 +27,7 @@ import android.view.animation.OvershootInterpolator
 import com.tachibanayu24.todocounter.MainActivity
 import com.tachibanayu24.todocounter.R
 import com.tachibanayu24.todocounter.api.TaskCount
+import timber.log.Timber
 import kotlin.math.abs
 
 class TaskCounterOverlay(
@@ -120,7 +121,7 @@ class TaskCounterOverlay(
                 context.startActivity(playStoreIntent)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.e(e, "Error in overlay")
         }
     }
 
@@ -131,7 +132,7 @@ class TaskCounterOverlay(
             }
             context.startActivity(intent)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.e(e, "Error in overlay")
         }
     }
 

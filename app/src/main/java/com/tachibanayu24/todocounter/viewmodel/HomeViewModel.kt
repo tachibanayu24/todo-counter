@@ -1,20 +1,21 @@
 package com.tachibanayu24.todocounter.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tachibanayu24.todocounter.api.ITasksRepository
 import com.tachibanayu24.todocounter.api.PendingTask
 import com.tachibanayu24.todocounter.api.TaskCount
-import com.tachibanayu24.todocounter.api.TasksRepository
 import com.tachibanayu24.todocounter.api.TaskStatus
 import com.tachibanayu24.todocounter.api.TaskListInfo
-import java.time.LocalDate
-import com.tachibanayu24.todocounter.data.AppDatabase
 import com.tachibanayu24.todocounter.data.repository.CompletionRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import java.time.LocalDate
+import javax.inject.Inject
 
 data class HomeUiState(
     val taskCount: TaskCount? = null,
@@ -29,11 +30,11 @@ data class HomeUiState(
     val isAddingTask: Boolean = false
 )
 
-class HomeViewModel(application: Application) : AndroidViewModel(application) {
-    private val tasksRepository = TasksRepository(application)
-    private val completionRepository = CompletionRepository(
-        AppDatabase.getInstance(application).dailyCompletionDao()
-    )
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val tasksRepository: ITasksRepository,
+    private val completionRepository: CompletionRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -46,19 +47,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
-                val taskCount = tasksRepository.getTaskCount()
+                val taskCountResult = tasksRepository.getTaskCount()
                 val todayCompletion = completionRepository.getTodayCompletion()
                 val streak = completionRepository.getCurrentStreak()
-                val pendingTasks = tasksRepository.getPendingTasksDueToday()
+                val pendingTasksResult = tasksRepository.getPendingTasksDueToday()
 
                 _uiState.value = _uiState.value.copy(
-                    taskCount = taskCount,
+                    taskCount = taskCountResult.getOrNull(),
                     todayCompleted = todayCompletion?.completedCount ?: 0,
                     currentStreak = streak,
-                    pendingTasks = pendingTasks,
-                    isLoading = false
+                    pendingTasks = pendingTasksResult.getOrNull() ?: emptyList(),
+                    isLoading = false,
+                    error = taskCountResult.exceptionOrNull()?.message
+                        ?: pendingTasksResult.exceptionOrNull()?.message
                 )
             } catch (e: Exception) {
+                Timber.e(e, "Failed to load home data")
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = e.message
@@ -74,14 +78,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
 
             val newCompleted = task.status != TaskStatus.COMPLETED
-            val success = tasksRepository.updateTaskStatus(
+            val result = tasksRepository.updateTaskStatus(
                 taskListId = task.taskListId,
                 taskId = task.id,
                 completed = newCompleted
             )
 
-            if (success) {
-                // ローカル状態を即座に更新
+            if (result.isSuccess) {
                 val updatedTasks = _uiState.value.pendingTasks.map {
                     if (it.id == task.id) {
                         it.copy(status = if (newCompleted) TaskStatus.COMPLETED else TaskStatus.NEEDS_ACTION)
@@ -96,9 +99,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     updatingTaskIds = _uiState.value.updatingTaskIds - task.id
                 )
 
-                // タスクカウントも更新
                 loadData()
             } else {
+                Timber.e(result.exceptionOrNull(), "Failed to toggle task status")
                 _uiState.value = _uiState.value.copy(
                     updatingTaskIds = _uiState.value.updatingTaskIds - task.id
                 )
@@ -118,11 +121,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadTaskLists() {
         viewModelScope.launch {
-            try {
-                val lists = tasksRepository.getTaskLists()
+            val result = tasksRepository.getTaskLists()
+            result.onSuccess { lists ->
                 _uiState.value = _uiState.value.copy(taskLists = lists)
-            } catch (e: Exception) {
-                e.printStackTrace()
+            }.onError { e ->
+                Timber.e(e, "Failed to load task lists")
             }
         }
     }
@@ -135,21 +138,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isAddingTask = true)
-            try {
-                val success = tasksRepository.addTask(
-                    taskListId = taskListId,
-                    title = title,
-                    notes = notes,
-                    dueDate = dueDate
-                )
-                if (success) {
-                    loadData()
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                _uiState.value = _uiState.value.copy(isAddingTask = false)
+            val result = tasksRepository.addTask(
+                taskListId = taskListId,
+                title = title,
+                notes = notes,
+                dueDate = dueDate
+            )
+            result.onSuccess {
+                loadData()
+            }.onError { e ->
+                Timber.e(e, "Failed to add task")
             }
+            _uiState.value = _uiState.value.copy(isAddingTask = false)
         }
     }
 }

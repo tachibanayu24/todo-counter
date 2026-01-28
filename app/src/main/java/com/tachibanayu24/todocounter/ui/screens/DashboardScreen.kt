@@ -24,7 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.tachibanayu24.todocounter.data.entity.CompletedTask
 import com.tachibanayu24.todocounter.ui.components.AnimatedCard
 import com.tachibanayu24.todocounter.ui.components.HeatmapCalendar
@@ -36,7 +36,7 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(viewModel: DashboardViewModel = viewModel()) {
+fun DashboardScreen(viewModel: DashboardViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
 

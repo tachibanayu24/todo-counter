@@ -1,17 +1,18 @@
 package com.tachibanayu24.todocounter.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.tachibanayu24.todocounter.data.AppDatabase
+import com.tachibanayu24.todocounter.data.dao.CompletedTaskDao
 import com.tachibanayu24.todocounter.data.entity.CompletedTask
 import com.tachibanayu24.todocounter.data.entity.DailyCompletion
 import com.tachibanayu24.todocounter.data.repository.CompletionRepository
 import com.tachibanayu24.todocounter.data.repository.CompletionStats
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 enum class ChartPeriod { WEEK, MONTH }
 
@@ -26,10 +27,11 @@ data class DashboardUiState(
     val selectedDate: String? = null
 )
 
-class DashboardViewModel(application: Application) : AndroidViewModel(application) {
-    private val db = AppDatabase.getInstance(application)
-    private val completionRepository = CompletionRepository(db.dailyCompletionDao())
-    private val completedTaskDao = db.completedTaskDao()
+@HiltViewModel
+class DashboardViewModel @Inject constructor(
+    private val completionRepository: CompletionRepository,
+    private val completedTaskDao: CompletedTaskDao
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()

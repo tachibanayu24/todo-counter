@@ -4,8 +4,11 @@ import com.tachibanayu24.todocounter.data.dao.DailyCompletionDao
 import com.tachibanayu24.todocounter.data.entity.DailyCompletion
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import javax.inject.Inject
 
-class CompletionRepository(private val dao: DailyCompletionDao) {
+class CompletionRepository @Inject constructor(
+    private val dao: DailyCompletionDao
+) {
 
     private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
@@ -37,9 +40,6 @@ class CompletionRepository(private val dao: DailyCompletionDao) {
         return fillMissingDates(startDate, endDate)
     }
 
-    /**
-     * 指定期間のすべての日付を含むリストを返す（データがない日は0で埋める）
-     */
     private suspend fun fillMissingDates(startDate: LocalDate, endDate: LocalDate): List<DailyCompletion> {
         val existingData = dao.getRange(
             startDate.format(dateFormatter),
@@ -70,7 +70,6 @@ class CompletionRepository(private val dao: DailyCompletionDao) {
         val total = dao.getTotalCompleted() ?: 0
         val firstDateStr = dao.getFirstRecordDate()
 
-        // 平均: 最初の記録日から今日までの全日数で計算
         val average = if (firstDateStr != null && total > 0) {
             val firstDate = LocalDate.parse(firstDateStr, dateFormatter)
             val today = LocalDate.now()
@@ -96,11 +95,9 @@ class CompletionRepository(private val dao: DailyCompletionDao) {
         var streak = 0
         var currentDate = LocalDate.now()
 
-        // 今日の記録を確認
         val todayStr = currentDate.format(dateFormatter)
         val todayCompletion = completions[todayStr]
 
-        // 今日に記録がなければ昨日から開始
         if (todayCompletion == null || todayCompletion.completedCount == 0) {
             currentDate = currentDate.minusDays(1)
         }

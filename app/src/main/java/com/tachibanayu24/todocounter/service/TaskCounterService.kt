@@ -5,28 +5,30 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.provider.Settings
-import com.tachibanayu24.todocounter.api.TasksRepository
-import com.tachibanayu24.todocounter.data.AppDatabase
+import com.tachibanayu24.todocounter.api.ITasksRepository
 import com.tachibanayu24.todocounter.data.repository.CompletionRepository
 import com.tachibanayu24.todocounter.overlay.TaskCounterOverlay
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import timber.log.Timber
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class TaskCounterService : Service() {
 
+    @Inject
+    lateinit var repository: ITasksRepository
+
+    @Inject
+    lateinit var completionRepository: CompletionRepository
+
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private lateinit var repository: TasksRepository
-    private lateinit var completionRepository: CompletionRepository
     private var overlay: TaskCounterOverlay? = null
     private var periodicJob: Job? = null
-    private var lastTaskCount: Int? = null  // 前回のタスク数を保存
+    private var lastTaskCount: Int? = null
 
     override fun onCreate() {
         super.onCreate()
-        repository = TasksRepository(this)
-        completionRepository = CompletionRepository(
-            AppDatabase.getInstance(this).dailyCompletionDao()
-        )
-
         if (Settings.canDrawOverlays(this)) {
             overlay = TaskCounterOverlay(this) { onOverlayTap() }
         }
@@ -62,14 +64,17 @@ class TaskCounterService : Service() {
 
     private fun updateOverlay(vibrateOnSuccess: Boolean = false) {
         scope.launch {
-            val count = repository.getTaskCount()
+            val result = repository.getTaskCount()
+            val count = result.getOrNull()
 
-            // オーバーレイを初期化（権限が後から許可された場合）
+            if (result.isError) {
+                Timber.e(result.exceptionOrNull(), "Failed to get task count in service")
+            }
+
             if (overlay == null && Settings.canDrawOverlays(this@TaskCounterService)) {
                 overlay = TaskCounterOverlay(this@TaskCounterService) { onOverlayTap() }
             }
 
-            // オーバーレイ：0なら非表示、1以上なら表示
             overlay?.let {
                 val total = count?.total ?: 0
                 val previousCount = lastTaskCount
@@ -82,22 +87,18 @@ class TaskCounterService : Service() {
                     it.show(count)
                 }
 
-                // fetch成功時にバイブ
                 if (vibrateOnSuccess && count != null) {
                     it.vibrate()
 
-                    // タスクが減っていた場合のみ成功アニメーション & DB記録
                     if (previousCount != null && total < previousCount) {
                         val completedCount = previousCount - total
                         it.animateSuccess()
-                        // DBに完了数を記録
                         scope.launch(Dispatchers.IO) {
                             completionRepository.recordCompletion(completedCount)
                         }
                     }
                 }
 
-                // 今回のタスク数を保存
                 lastTaskCount = total
             }
         }

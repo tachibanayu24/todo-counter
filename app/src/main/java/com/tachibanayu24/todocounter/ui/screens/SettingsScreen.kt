@@ -25,7 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.tachibanayu24.todocounter.R
@@ -35,7 +35,7 @@ import com.tachibanayu24.todocounter.ui.theme.Red
 import com.tachibanayu24.todocounter.viewmodel.SettingsViewModel
 
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
+fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()

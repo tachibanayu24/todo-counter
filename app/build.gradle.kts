@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
+    id("com.google.dagger.hilt.android")
 }
 
 apply(plugin = "com.google.android.gms.oss-licenses-plugin")
@@ -40,6 +41,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -74,6 +76,11 @@ dependencies {
     // Navigation Compose
     implementation("androidx.navigation:navigation-compose:2.8.5")
 
+    // Hilt
+    implementation("com.google.dagger:hilt-android:2.51.1")
+    ksp("com.google.dagger:hilt-android-compiler:2.51.1")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+
     // Room Database
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
@@ -89,6 +96,9 @@ dependencies {
 
     // OSS Licenses
     implementation("com.google.android.gms:play-services-oss-licenses:17.1.0")
+
+    // Timber (Logging)
+    implementation("com.jakewharton.timber:timber:5.0.1")
 
     // Debug
     debugImplementation("androidx.compose.ui:ui-tooling")
