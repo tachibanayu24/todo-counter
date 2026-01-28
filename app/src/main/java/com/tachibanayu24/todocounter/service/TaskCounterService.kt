@@ -76,7 +76,13 @@ class TaskCounterService : Service() {
             }
 
             overlay?.let {
-                val total = count?.total ?: 0
+                // countがnullの場合（エラーまたは未サインイン）はオーバーレイを非表示
+                if (count == null) {
+                    it.hide()
+                    return@launch
+                }
+
+                val total = count.total
                 val previousCount = lastTaskCount
 
                 if (total == 0) {
@@ -87,7 +93,7 @@ class TaskCounterService : Service() {
                     it.show(count)
                 }
 
-                if (vibrateOnSuccess && count != null) {
+                if (vibrateOnSuccess) {
                     it.vibrate()
 
                     if (previousCount != null && total < previousCount) {

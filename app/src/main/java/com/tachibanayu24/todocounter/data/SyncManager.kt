@@ -14,9 +14,13 @@ class SyncManager @Inject constructor(
     private val completionRepository: CompletionRepository,
     private val completedTaskDao: CompletedTaskDao
 ) {
+    /**
+     * 指定日数分の完了タスクをGoogle Tasksから同期
+     */
     suspend fun syncCompletedTasks(days: Int): SyncResult {
         val now = Instant.now()
         val completedAfter = now.minusSeconds(days.toLong() * 24 * 60 * 60)
+        val startDate = java.time.LocalDate.now().minusDays(days.toLong())
 
         val result = tasksRepository.getCompletedTasks(completedAfter)
 
@@ -32,6 +36,7 @@ class SyncManager @Inject constructor(
 
         val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
+        // completed_tasksテーブルにタスク詳細を保存（taskIdでupsert）
         val taskEntities = completedTasks.map { task ->
             CompletedTask(
                 taskId = task.id,
@@ -42,16 +47,21 @@ class SyncManager @Inject constructor(
         }
         completedTaskDao.upsertAll(taskEntities)
 
-        val dailyCounts = completedTasks
-            .groupBy { it.completedAt }
-            .mapValues { it.value.size }
-
-        for ((date, count) in dailyCounts) {
-            val dateStr = date.format(dateFormatter)
-            completionRepository.setCompletion(dateStr, count)
+        // DBから日付ごとの正確なカウントを再集計してdaily_completionsを更新
+        val dailyCounts = completedTaskDao.getDailyCountsFrom(startDate.format(dateFormatter))
+        for (dailyCount in dailyCounts) {
+            completionRepository.setCompletion(dailyCount.date, dailyCount.count)
         }
 
+        Timber.d("Synced ${completedTasks.size} tasks, updated ${dailyCounts.size} daily counts")
         return SyncResult(synced = completedTasks.size)
+    }
+
+    /**
+     * 今日の完了タスクのみを軽量に同期
+     */
+    suspend fun syncTodayCompletedTasks(): SyncResult {
+        return syncCompletedTasks(1)
     }
 }
 

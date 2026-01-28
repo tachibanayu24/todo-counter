@@ -80,9 +80,11 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
         hasBatteryOptimizationExemption = pm.isIgnoringBatteryOptimizations(context.packageName)
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(isSignedIn, hasOverlayPermission) {
         if (isSignedIn && hasOverlayPermission) {
             TaskCounterService.start(context)
+        } else {
+            TaskCounterService.stop(context)
         }
     }
 

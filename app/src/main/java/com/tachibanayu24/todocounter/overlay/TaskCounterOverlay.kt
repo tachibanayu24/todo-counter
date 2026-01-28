@@ -305,7 +305,12 @@ class TaskCounterOverlay(
             val scale = minOf(maxSize / original.width, maxSize / original.height)
             val newWidth = (original.width * scale).toInt()
             val newHeight = (original.height * scale).toInt()
-            Bitmap.createScaledBitmap(original, newWidth, newHeight, true)
+            val scaled = Bitmap.createScaledBitmap(original, newWidth, newHeight, true)
+            // 元のビットマップとスケール後のビットマップが異なる場合のみrecycle
+            if (scaled !== original) {
+                original.recycle()
+            }
+            scaled
         } catch (e: Exception) {
             null
         }
@@ -694,6 +699,21 @@ class TaskCounterOverlay(
 
             canvas.restore()
             textPaint.alpha = 255
+        }
+
+        override fun onDetachedFromWindow() {
+            super.onDetachedFromWindow()
+            // アニメーターをキャンセルしてリソースを解放
+            currentAnimator?.cancel()
+            idleAnimator?.cancel()
+            colorAnimator?.cancel()
+            rotationAnimator?.cancel()
+            tadaAnimator?.cancel()
+            currentAnimator = null
+            idleAnimator = null
+            colorAnimator = null
+            rotationAnimator = null
+            tadaAnimator = null
         }
     }
 }

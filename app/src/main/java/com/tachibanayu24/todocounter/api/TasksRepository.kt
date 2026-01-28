@@ -14,7 +14,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -96,9 +95,8 @@ class TasksRepository @Inject constructor(
             ?: return@withContext Result.Error(IllegalStateException("Not signed in"))
 
         Result.runCatching {
-            val localDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-            val todayStr = localDateFormat.format(Date())
-            val todayDate = localDateFormat.parse(todayStr)!!
+            // 今日の日付（ローカルタイムゾーン）
+            val today = LocalDate.now()
 
             val taskLists = service.tasklists().list().execute().items ?: emptyList()
 
@@ -115,12 +113,12 @@ class TasksRepository @Inject constructor(
                 for (task in tasks) {
                     if (task.due == null) continue
 
-                    val dueDate = DateTimeUtil.parseRfc3339ToDate(task.due) ?: continue
-                    val dueDateStr = localDateFormat.format(dueDate)
+                    // 期限日をLocalDateとしてパース（UTCベースで日付のみ抽出）
+                    val dueDate = DateTimeUtil.parseRfc3339ToLocalDate(task.due) ?: continue
 
                     when {
-                        dueDate.before(todayDate) -> overdueCount++
-                        dueDateStr == todayStr -> todayCount++
+                        dueDate.isBefore(today) -> overdueCount++
+                        dueDate.isEqual(today) -> todayCount++
                     }
                 }
             }

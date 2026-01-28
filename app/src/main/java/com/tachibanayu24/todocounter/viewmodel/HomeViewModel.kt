@@ -7,6 +7,7 @@ import com.tachibanayu24.todocounter.api.PendingTask
 import com.tachibanayu24.todocounter.api.TaskCount
 import com.tachibanayu24.todocounter.api.TaskStatus
 import com.tachibanayu24.todocounter.api.TaskListInfo
+import com.tachibanayu24.todocounter.data.SyncManager
 import com.tachibanayu24.todocounter.data.repository.CompletionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +34,8 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val tasksRepository: ITasksRepository,
-    private val completionRepository: CompletionRepository
+    private val completionRepository: CompletionRepository,
+    private val syncManager: SyncManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -47,6 +49,9 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
+                // 今日の完了タスクを同期してからデータを取得
+                syncManager.syncTodayCompletedTasks()
+
                 val taskCountResult = tasksRepository.getTaskCount()
                 val todayCompletion = completionRepository.getTodayCompletion()
                 val streak = completionRepository.getCurrentStreak()
