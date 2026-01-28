@@ -10,4 +10,15 @@
     <string name="battery_optimization_description">バックグラウンド動作に必要</string>
     <string name="open_settings">設定を開く</string>
     <string name="fetch_failed">タスクを取得できませんでした</string>
+    <string name="add_task">タスクを追加</string>
+    <string name="task_title">タイトル</string>
+    <string name="task_notes">詳細（任意）</string>
+    <string name="task_list">タスクリスト</string>
+    <string name="due_date">期限日</string>
+    <string name="due_date_optional">任意</string>
+    <string name="select_date">日付を選択</string>
+    <string name="clear">クリア</string>
+    <string name="add">追加</string>
+    <string name="cancel">キャンセル</string>
+    <string name="ok">OK</string>
 </resources>

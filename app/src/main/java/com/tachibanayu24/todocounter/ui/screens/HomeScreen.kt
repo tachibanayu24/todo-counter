@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.*
@@ -26,7 +27,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tachibanayu24.todocounter.R
 import com.tachibanayu24.todocounter.auth.GoogleAuthManager
 import com.tachibanayu24.todocounter.service.TaskCounterService
+import com.tachibanayu24.todocounter.ui.components.AddTaskDialog
 import com.tachibanayu24.todocounter.ui.components.AnimatedCounter
+import com.tachibanayu24.todocounter.ui.components.TaskListSection
 import com.tachibanayu24.todocounter.ui.theme.Green
 import com.tachibanayu24.todocounter.ui.theme.Red
 import com.tachibanayu24.todocounter.ui.theme.Yellow
@@ -39,6 +42,7 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
     val authManager = remember { GoogleAuthManager(context) }
 
     var isSignedIn by remember { mutableStateOf(authManager.isSignedIn()) }
+    var showAddTaskDialog by remember { mutableStateOf(false) }
     var hasOverlayPermission by remember {
         mutableStateOf(Settings.canDrawOverlays(context))
     }
@@ -82,10 +86,31 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
         }
     }
 
-    Surface(
+    Scaffold(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
+        containerColor = MaterialTheme.colorScheme.background,
+        floatingActionButton = {
+            if (isSignedIn) {
+                FloatingActionButton(
+                    onClick = {
+                        viewModel.loadTaskLists()
+                        showAddTaskDialog = true
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = stringResource(R.string.add_task)
+                    )
+                }
+            }
+        }
+    ) { paddingValues ->
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            color = MaterialTheme.colorScheme.background
+        ) {
         if (!isSignedIn) {
             // Sign in prompt
             Column(
@@ -213,6 +238,18 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
                             label = "Day streak"
                         )
                     }
+
+                    // Task list section
+                    if (uiState.pendingTasks.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(32.dp))
+                        TaskListSection(
+                            tasks = uiState.pendingTasks,
+                            expandedTaskId = uiState.expandedTaskId,
+                            updatingTaskIds = uiState.updatingTaskIds,
+                            onToggleStatus = { task -> viewModel.toggleTaskStatus(task) },
+                            onToggleExpand = { taskId -> viewModel.toggleTaskExpand(taskId) }
+                        )
+                    }
                 } else if (uiState.error != null) {
                     Text(
                         text = stringResource(R.string.fetch_failed),
@@ -223,6 +260,20 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
                 Spacer(modifier = Modifier.height(48.dp))
                 }
             }
+        }
+        }
+
+        // Add Task Dialog
+        if (showAddTaskDialog) {
+            AddTaskDialog(
+                taskLists = uiState.taskLists,
+                isLoading = uiState.isAddingTask,
+                onDismiss = { showAddTaskDialog = false },
+                onAddTask = { taskListId, title, notes, dueDate ->
+                    viewModel.addTask(taskListId, title, notes, dueDate)
+                    showAddTaskDialog = false
+                }
+            )
         }
     }
 }

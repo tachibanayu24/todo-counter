@@ -15,7 +15,7 @@ class GoogleAuthManager(private val context: Context) {
 
     private val signInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
         .requestEmail()
-        .requestScopes(Scope(TasksScopes.TASKS_READONLY))
+        .requestScopes(Scope(TasksScopes.TASKS))
         .build()
 
     private val signInClient: GoogleSignInClient = GoogleSignIn.getClient(context, signInOptions)

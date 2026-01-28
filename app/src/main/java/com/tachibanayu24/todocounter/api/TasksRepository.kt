@@ -23,11 +23,31 @@ data class TaskCount(
     val total: Int get() = overdue + today
 }
 
+enum class TaskStatus {
+    NEEDS_ACTION,
+    COMPLETED
+}
+
+data class PendingTask(
+    val id: String,
+    val taskListId: String,
+    val title: String,
+    val notes: String?,
+    val due: LocalDate,
+    val status: TaskStatus,
+    val isOverdue: Boolean
+)
+
 data class CompletedTask(
     val id: String,
     val title: String,
     val completedAt: LocalDate,
     val completedAtTimestamp: Long  // ミリ秒
+)
+
+data class TaskListInfo(
+    val id: String,
+    val title: String
 )
 
 class TasksRepository(private val context: Context) {
@@ -37,7 +57,7 @@ class TasksRepository(private val context: Context) {
 
         val credential = GoogleAccountCredential.usingOAuth2(
             context,
-            listOf(TasksScopes.TASKS_READONLY)
+            listOf(TasksScopes.TASKS)
         ).apply {
             selectedAccount = account.account
         }
@@ -198,6 +218,159 @@ class TasksRepository(private val context: Context) {
             } catch (e: Exception) {
                 null
             }
+        }
+    }
+
+    /**
+     * 今日までが期日のタスク（期限切れ + 今日）を取得
+     * 完了/未完了両方を含む
+     */
+    suspend fun getPendingTasksDueToday(): List<PendingTask> = withContext(Dispatchers.IO) {
+        val service = getTasksService() ?: return@withContext emptyList()
+
+        try {
+            val today = LocalDate.now()
+            val taskLists = service.tasklists().list().execute().items ?: emptyList()
+            val pendingTasks = mutableListOf<PendingTask>()
+
+            for (taskList in taskLists) {
+                // 未完了タスクを取得
+                val incompleteTasks = service.tasks().list(taskList.id)
+                    .setShowCompleted(false)
+                    .setShowHidden(false)
+                    .execute()
+                    .items ?: emptyList()
+
+                // 完了タスクも取得（今日完了したもののみ）
+                val todayStartRfc3339 = today.atStartOfDay(ZoneId.of("UTC"))
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'"))
+                val completedTasks = service.tasks().list(taskList.id)
+                    .setShowCompleted(true)
+                    .setShowHidden(true)
+                    .setCompletedMin(todayStartRfc3339)
+                    .execute()
+                    .items?.filter { it.status == "completed" } ?: emptyList()
+
+                val allTasks = incompleteTasks + completedTasks
+
+                for (task in allTasks) {
+                    if (task.due == null) continue
+
+                    val dueDate = parseDueDateToLocalDate(task.due) ?: continue
+
+                    // 今日以前のタスクのみ対象
+                    if (dueDate.isAfter(today)) continue
+
+                    val isOverdue = dueDate.isBefore(today)
+                    val status = if (task.status == "completed") TaskStatus.COMPLETED else TaskStatus.NEEDS_ACTION
+
+                    pendingTasks.add(
+                        PendingTask(
+                            id = task.id,
+                            taskListId = taskList.id,
+                            title = task.title ?: "",
+                            notes = task.notes,
+                            due = dueDate,
+                            status = status,
+                            isOverdue = isOverdue
+                        )
+                    )
+                }
+            }
+
+            // ソート: 未完了が先、その中で期日が古い順
+            pendingTasks.sortedWith(
+                compareBy<PendingTask> { it.status == TaskStatus.COMPLETED }
+                    .thenBy { it.due }
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    /**
+     * タスクの完了/未完了状態を更新
+     */
+    suspend fun updateTaskStatus(
+        taskListId: String,
+        taskId: String,
+        completed: Boolean
+    ): Boolean = withContext(Dispatchers.IO) {
+        val service = getTasksService() ?: return@withContext false
+
+        try {
+            val task = service.tasks().get(taskListId, taskId).execute()
+            task.status = if (completed) "completed" else "needsAction"
+            if (!completed) {
+                task.completed = null
+            }
+            service.tasks().update(taskListId, taskId, task).execute()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    private fun parseDueDateToLocalDate(dueString: String): LocalDate? {
+        return try {
+            // RFC 3339 形式 (例: 2024-01-15T00:00:00.000Z)
+            val instant = Instant.parse(dueString)
+            instant.atZone(ZoneId.of("UTC")).toLocalDate()
+        } catch (e: Exception) {
+            try {
+                // フォールバック: yyyy-MM-dd 形式
+                LocalDate.parse(dueString.substring(0, 10))
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    /**
+     * タスクリスト一覧を取得
+     */
+    suspend fun getTaskLists(): List<TaskListInfo> = withContext(Dispatchers.IO) {
+        val service = getTasksService() ?: return@withContext emptyList()
+
+        try {
+            val taskLists = service.tasklists().list().execute().items ?: emptyList()
+            taskLists.map { TaskListInfo(id = it.id, title = it.title) }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    /**
+     * タスクを追加
+     */
+    suspend fun addTask(
+        taskListId: String,
+        title: String,
+        notes: String? = null,
+        dueDate: LocalDate? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        val service = getTasksService() ?: return@withContext false
+
+        try {
+            val task = com.google.api.services.tasks.model.Task().apply {
+                this.title = title
+                if (notes != null) {
+                    this.notes = notes
+                }
+                if (dueDate != null) {
+                    // Google Tasks APIはRFC 3339形式を期待
+                    this.due = dueDate.atStartOfDay(ZoneId.of("UTC"))
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
+                }
+            }
+            service.tasks().insert(taskListId, task).execute()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
         }
     }
 }
